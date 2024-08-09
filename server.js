@@ -68,7 +68,7 @@ const initializeRoom = (roomId)=>{
         questions:[],
         remainingSong:[],
         songIndex:0,
-        players:[],
+        players:{},
         playerAnswers:{},
         gameStarted:false,
         gameSetUpComplete: false
@@ -85,26 +85,35 @@ io.on('connection',(socket)=>{
     socket.on('disconnect',()=>{
         console.log("user disconnected");
         for (const roomId of Object.keys(rooms)) {
-            if (rooms[roomId]["players"].includes(socket.id)) {
-                rooms[roomId]["players"] = rooms[roomId]["players"].filter(id => id !== socket.id);
-                io.in(roomId).emit('roomPopulation', rooms[roomId]["players"].length);
-                if (rooms[roomId]["players"].length === 0) {
+            if(Object.keys(rooms[roomId]["players"]).includes(socket.id)){
+
+                for(const key of Object.keys(rooms[roomId]["players"])){
+                    if(key==socket.id){
+                        delete rooms[roomId]["players"][key];
+                        delete rooms[roomId]["playerAnswers"][key];
+                        io.in(roomId).emit('roomPopulation', Object.keys(rooms[roomId]["players"]).length);
+                    }
+                }
+                if (Object.keys(rooms[roomId]["players"]).length === 0) {
                     delete rooms[roomId];
                 }
             }
         }
+        console.log("user dc",rooms);
+        
     })
     socket.on("joinRoom",(data)=>{
-        if(rooms[data]){
-            if(rooms[data]["gameStarted"]){
+        console.log("data")
+        if(rooms[data.room]){
+            if(rooms[data.room]["gameStarted"]){
                 socket.emit("joinStatus",false);
                 return;
             }
-            rooms[data]["players"].push(socket.id);
-            rooms[data]["playerAnswers"][socket.id]=[];
-            socket.join(data);
+            rooms[data.room]["players"][socket.id]=data.username;
+            rooms[data.room]["playerAnswers"][socket.id]=[];
+            socket.join(data.room);
             // socket.in(data).emit("roomPopulation",rooms[data].length);
-            io.in(data).emit("roomPopulation", rooms[data]["players"].length);
+            io.in(data.room).emit("roomPopulation", Object.keys(rooms[data.room]["players"]).length);
             socket.emit("joinStatus",true);
             console.log("joined");
         }
@@ -115,20 +124,20 @@ io.on('connection',(socket)=>{
     })
     socket.on("hostRoom",(data)=>{
         console.log("hosted room",data);
-        if(rooms[data]){
+        if(rooms[data.room]){
             socket.emit("hostStatus",false);
             console.log("host occupied");
             return;
         }
-        if(!rooms[data]){
-            initializeRoom(data);
+        if(!rooms[data.room]){
+            initializeRoom(data.room);
         }
-        rooms[data]["players"].push(socket.id);
-        rooms[data]["playerAnswers"][socket.id]=[];
-        socket.join(data);
+        rooms[data.room]["players"][socket.id]=data.username;
+        rooms[data.room]["playerAnswers"][socket.id]=[];
+        socket.join(data.room);
         socket.emit("hostStatus",true);
-        socket.in(data).emit("roomPopulation",rooms[data]["players"].length);
-        console.log("host success");
+        socket.in(data.room).emit("roomPopulation",Object.keys(rooms[data.room]["players"]).length);
+        console.log("host success",rooms[data.room]);
     });
     socket.on("gameStart",(data)=>{
         rooms[data].gameStarted=true;
@@ -160,24 +169,26 @@ io.on('connection',(socket)=>{
     })
 
     socket.on("recordMultiplayerChoice",(data)=>{
-        console.log("record multi",data.user,rooms[data.room]["players"]);
+        // console.log("record multi",data.user,rooms[data.room]["players"]);
         rooms[data.room]["playerAnswers"][data.user].push(data.correct);
         console.log("record multi",rooms[data.room]["playerAnswers"]);
 
-        const allPlayers = rooms[data.room]["players"];
+        // const allPlayers = rooms[data.room]["players"];
         let songIndex= rooms[data.room]["songIndex"];
         const playerAnswers = rooms[data.room]["playerAnswers"];
+        const players = rooms[data.room]["players"];
         console.log("song index",songIndex)
-        if(rooms[data.room]["playerAnswers"][data.user].length==10){
-            io.in(data.room).emit("multiplayerEndScreen",{playerAnswers});
-            return;
-        }
+
         for(const [key,value] of Object.entries(playerAnswers)){
-      
+
             arrayLength=value.length;
             if(arrayLength!=(songIndex+1)){
                 return;
             }
+        }
+        if(rooms[data.room]["playerAnswers"][data.user].length==10){
+            io.in(data.room).emit("multiplayerEndScreen",{playerAnswers,players});
+            return;
         }
         setTimeout(()=>{
             rooms[data.room]["songIndex"]++;
