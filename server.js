@@ -81,7 +81,7 @@ const ShuffleSongChoices = (quizSong,choiceOne,choiceTwo)=>{
 }
 
 io.on('connection',(socket)=>{
-    console.log("a user connected");
+    console.log("a user connected",rooms);
     socket.on('disconnect',()=>{
         console.log("user disconnected");
         for (const roomId of Object.keys(rooms)) {
@@ -140,6 +140,9 @@ io.on('connection',(socket)=>{
         console.log("host success",rooms[data.room]);
     });
     socket.on("gameStart",(data)=>{
+        if(!rooms[data]){
+            return;
+        }
         rooms[data].gameStarted=true;
         io.in(data).emit("startGame",rooms[data].gameStarted);
         // console.log("backendsend of gameStart",data);
