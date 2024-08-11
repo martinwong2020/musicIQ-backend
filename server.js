@@ -92,9 +92,43 @@ io.on('connection',(socket)=>{
                         delete rooms[roomId]["players"][key];
                         delete rooms[roomId]["playerAnswers"][key];
                         io.in(roomId).emit('roomPopulation', Object.keys(rooms[roomId]["players"]).length);
+                        io.in(roomId).emit("receivePlayers",rooms[roomId]["players"]);
+                        // io.in(roomId).emit('receiveRefreshRequest');
+
+                        const playerAnswers = rooms[roomId]["playerAnswers"];
+                        const songIndex = rooms[roomId]["songIndex"];
+                        let allPlayersAnswered = true;
+
+                        for (const answers of Object.values(playerAnswers)) {
+                            if (answers.length !== songIndex + 1) {
+                                allPlayersAnswered = false;
+                                break;
+                            }
+                        }
+
+                        // If all players have answered, move to the next question
+                        if (allPlayersAnswered) {
+                            if (Object.keys(rooms[roomId]["players"]).length === 0) {
+                                delete rooms[roomId];
+                            } else {
+                                setTimeout(() => {
+                                    console.log("in time");
+                                    rooms[roomId]["songIndex"]++;
+                                    let index = rooms[roomId]["songIndex"];
+                                    let songChoices = ShuffleSongChoices(
+                                        rooms[roomId]["questions"][index], 
+                                        rooms[roomId]["remainingSong"][index], 
+                                        rooms[roomId]["remainingSong"][index + 1]
+                                    );
+                                    let correctSong = rooms[roomId]["questions"][index];
+                                    io.in(roomId).emit("multiplayerGameBoard", { songChoices, correctSong, index });
+                                }, 1000);
+                            }
+                        }
                     }
                 }
-                if (Object.keys(rooms[roomId]["players"]).length === 0) {
+                
+                if (rooms[roomId] && Object.keys(rooms[roomId]["players"]).length === 0) {
                     delete rooms[roomId];
                 }
             }
@@ -114,6 +148,7 @@ io.on('connection',(socket)=>{
             socket.join(data.room);
             // socket.in(data).emit("roomPopulation",rooms[data].length);
             io.in(data.room).emit("roomPopulation", Object.keys(rooms[data.room]["players"]).length);
+            io.in(data.room).emit("receivePlayers",rooms[data.room]["players"]);
             socket.emit("joinStatus",true);
             console.log("joined");
         }
@@ -137,6 +172,7 @@ io.on('connection',(socket)=>{
         socket.join(data.room);
         socket.emit("hostStatus",true);
         socket.in(data.room).emit("roomPopulation",Object.keys(rooms[data.room]["players"]).length);
+        io.in(data.room).emit("receivePlayers",rooms[data.room]["players"]);
         console.log("host success",rooms[data.room]);
     });
     socket.on("gameStart",(data)=>{
@@ -168,32 +204,41 @@ io.on('connection',(socket)=>{
         let index= rooms[data.room]["songIndex"];
         let songChoices=ShuffleSongChoices(rooms[data.room]["questions"][index], rooms[data.room]["remainingSong"][index], rooms[data.room]["remainingSong"][index+1]);
         let correctSong=rooms[data.room]["questions"][index];
+        let players = rooms[data.room]["players"];
         io.in(data.room).emit("multiplayerGameBoard",{songChoices,correctSong,index});
+        io.in(data.room).emit("receivePlayers",players)
     })
 
     socket.on("recordMultiplayerChoice",(data)=>{
         // console.log("record multi",data.user,rooms[data.room]["players"]);
-        rooms[data.room]["playerAnswers"][data.user].push(data.correct);
+        let songIndex= rooms[data.room]["songIndex"];
+        if(songIndex+1!=rooms[data.room]["playerAnswers"][data.user].length){
+            rooms[data.room]["playerAnswers"][data.user].push(data.correct);
+        }
         console.log("record multi",rooms[data.room]["playerAnswers"]);
 
         // const allPlayers = rooms[data.room]["players"];
-        let songIndex= rooms[data.room]["songIndex"];
+        // let songIndex= rooms[data.room]["songIndex"];
         const playerAnswers = rooms[data.room]["playerAnswers"];
         const players = rooms[data.room]["players"];
         console.log("song index",songIndex)
-
+        io.in(data.room).emit("receivePlayersResponse",playerAnswers);
         for(const [key,value] of Object.entries(playerAnswers)){
-
+            
             arrayLength=value.length;
+            console.log("in for looop",arrayLength);
             if(arrayLength!=(songIndex+1)){
                 return;
             }
         }
         if(rooms[data.room]["playerAnswers"][data.user].length==10){
+            
             io.in(data.room).emit("multiplayerEndScreen",{playerAnswers,players});
             return;
         }
+        console.log("out for looop");
         setTimeout(()=>{
+            console.log("in time");
             rooms[data.room]["songIndex"]++;
             let index= rooms[data.room]["songIndex"];
             let songChoices=ShuffleSongChoices(rooms[data.room]["questions"][index], rooms[data.room]["remainingSong"][index], rooms[data.room]["remainingSong"][index+1]);
@@ -201,15 +246,18 @@ io.on('connection',(socket)=>{
             io.in(data.room).emit("multiplayerGameBoard",{songChoices,correctSong,index});
         },1000);
        
-        // if (Object.keys(playerAnswers).length === (songIndex+1)) {
-        //     // All players have answered
-        //     rooms[data.room]["songIndex"]++;
-        //     let index= rooms[data.room]["songIndex"];
-        //     let songChoices=ShuffleSongChoices(rooms[data.room]["questions"][index], rooms[data.room]["remainingSong"][index], rooms[data.room]["remainingSong"][index+1]);
-        //     let correctSong=rooms[data.room]["questions"][index];
-        //     io.in(data.room).emit("multiplayerGameBoard",{songChoices,correctSong,index});
-        // }
-    })
+    });
+    // socket.on("refreshBoardRequest",(data)=>{
+    //         // questions:[],
+    //         // remainingSong:[],
+    //         // songIndex:0,
+    //         // players:{},
+    //         // playerAnswers:{},
+    //     const songIndex= rooms[data.room]["songIndex"];
+    //     const players = rooms[data.room]["players"];
+    //     const playerAnswers = rooms[data.room]["playerAnswers"];
+    //     socket.emit("receiveRefreshBoardRequest",{players});
+    // });
 })
 
 const PORT = 5000;
