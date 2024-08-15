@@ -71,6 +71,7 @@ const initializeRoom = (roomId)=>{
         players:{},
         playerAnswers:{},
         gameStarted:false,
+        hostStatus:false,
         gameSetUpComplete: false
     }
 }
@@ -158,22 +159,29 @@ io.on('connection',(socket)=>{
         }
     })
     socket.on("hostRoom",(data)=>{
-        console.log("hosted room",data);
-        if(rooms[data.room]){
+        // console.log("hosted room",data);
+        // if(rooms[data.room]){
+        //     socket.emit("hostStatus",false);
+        //     console.log("host occupied");
+        //     return;
+        // }
+        // if(!rooms[data.room]){
+        //     initializeRoom(data.room);
+        // }
+        console.log("in host ")
+        if(rooms[data.room]["hostStatus"]){
             socket.emit("hostStatus",false);
             console.log("host occupied");
             return;
         }
-        if(!rooms[data.room]){
-            initializeRoom(data.room);
-        }
         rooms[data.room]["players"][socket.id]=data.username;
         rooms[data.room]["playerAnswers"][socket.id]=[];
+        rooms[data.room]["hostStatus"]=true;
         socket.join(data.room);
         socket.emit("hostStatus",true);
         socket.in(data.room).emit("roomPopulation",Object.keys(rooms[data.room]["players"]).length);
         io.in(data.room).emit("receivePlayers",rooms[data.room]["players"]);
-        console.log("host success",rooms[data.room]);
+        console.log("host success");
     });
     socket.on("gameStart",(data)=>{
         if(!rooms[data]){
@@ -185,6 +193,10 @@ io.on('connection',(socket)=>{
     });
     socket.on("gameSetUp",(data)=>{
         // console.log(data.quizSongs,data.remainingSongs,data.room);
+        console.log('in gamesetuo',data.room);
+        if(!rooms[data.room]){
+            initializeRoom(data.room);
+        }
         rooms[data.room]["questions"]=data.quizSongs;
         rooms[data.room]["remainingSong"]=data.remainingSongs;
         rooms[data.room].gameSetUpComplete = true;
