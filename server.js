@@ -9,12 +9,12 @@ const server=http.createServer(app);
 
 const io = new Server(server,{
     cors:{
-        origin:"http://localhost:3000",
+        origin: process.env.FRONTEND_URL || "http://localhost:3000",
         methods:["GET","POST"]
     }
 })
 app.use(cors({
-    origin:"http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
 }));
@@ -159,15 +159,6 @@ io.on('connection',(socket)=>{
         }
     })
     socket.on("hostRoom",(data)=>{
-        // console.log("hosted room",data);
-        // if(rooms[data.room]){
-        //     socket.emit("hostStatus",false);
-        //     console.log("host occupied");
-        //     return;
-        // }
-        // if(!rooms[data.room]){
-        //     initializeRoom(data.room);
-        // }
         console.log("in host ")
         if(rooms[data.room]["hostStatus"]){
             socket.emit("hostStatus",false);
@@ -192,7 +183,6 @@ io.on('connection',(socket)=>{
         // console.log("backendsend of gameStart",data);
     });
     socket.on("gameSetUp",(data)=>{
-        // console.log(data.quizSongs,data.remainingSongs,data.room);
         console.log('in gamesetuo',data.room);
         if(!rooms[data.room]){
             initializeRoom(data.room);
@@ -200,9 +190,7 @@ io.on('connection',(socket)=>{
         rooms[data.room]["questions"]=data.quizSongs;
         rooms[data.room]["remainingSong"]=data.remainingSongs;
         rooms[data.room].gameSetUpComplete = true;
-        // console.log(ShuffleSongChoices(rooms[data.room]["questions"][index], rooms[data.room]["remainingSong"][index], rooms[data.room]["remainingSong"][index+1]));
         socket.in(data.room).emit("gameSetUpStatus",true);
-        // console.log("backend of gamesetup");
     });
     socket.on("readyMultiplayerClient",(data)=>{
         console.log("ready multi");
@@ -222,15 +210,12 @@ io.on('connection',(socket)=>{
     })
 
     socket.on("recordMultiplayerChoice",(data)=>{
-        // console.log("record multi",data.user,rooms[data.room]["players"]);
         let songIndex= rooms[data.room]["songIndex"];
         if(songIndex+1!=rooms[data.room]["playerAnswers"][data.user].length){
             rooms[data.room]["playerAnswers"][data.user].push(data.correct);
         }
         console.log("record multi",rooms[data.room]["playerAnswers"]);
 
-        // const allPlayers = rooms[data.room]["players"];
-        // let songIndex= rooms[data.room]["songIndex"];
         const playerAnswers = rooms[data.room]["playerAnswers"];
         const players = rooms[data.room]["players"];
         console.log("song index",songIndex)
@@ -259,18 +244,7 @@ io.on('connection',(socket)=>{
         },1000);
        
     });
-    // socket.on("refreshBoardRequest",(data)=>{
-    //         // questions:[],
-    //         // remainingSong:[],
-    //         // songIndex:0,
-    //         // players:{},
-    //         // playerAnswers:{},
-    //     const songIndex= rooms[data.room]["songIndex"];
-    //     const players = rooms[data.room]["players"];
-    //     const playerAnswers = rooms[data.room]["playerAnswers"];
-    //     socket.emit("receiveRefreshBoardRequest",{players});
-    // });
 })
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT,()=>{console.log(`server running on port ${PORT}`)})
